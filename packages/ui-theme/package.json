@@ -1,0 +1,17 @@
+{
+  "name": "@brick/ui-theme",
+  "version": "0.0.0",
+  "private": true,
+  "type": "module",
+  "main": "./index.ts",
+  "types": "./index.ts",
+  "exports": {
+    ".": "./index.ts"
+  },
+  "scripts": {
+    "dev": "pnpm exec tsc --watch --noEmit -p tsconfig.json",
+    "build": "pnpm exec tsc --noEmit -p tsconfig.json",
+    "typecheck": "pnpm exec tsc --noEmit -p tsconfig.json",
+    "lint": "echo 'Linting not configured yet'"
+  }
+}

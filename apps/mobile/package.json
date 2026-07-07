@@ -1,0 +1,17 @@
+{
+  "name": "@brick/mobile",
+  "private": true,
+  "dependencies": {
+    "expo": "~51.0.0",
+    "react": "18.2.0",
+    "react-native": "0.74.5",
+    "@brick/core-api": "workspace:*",
+    "@brick/ui-theme": "workspace:*"
+  },
+  "scripts": {
+    "dev": "expo start",
+    "android": "expo run:android",
+    "typecheck": "pnpm exec tsc --noEmit",
+    "lint": "echo 'Linting not configured yet'"
+  }
+}

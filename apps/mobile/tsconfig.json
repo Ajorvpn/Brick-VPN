@@ -1,0 +1,10 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": {
+    "strict": true,
+    "paths": {
+      "@brick/ui-theme": ["../../packages/ui-theme/index.ts"],
+      "@brick/core-api": ["../../packages/core-api/index.ts"]
+    }
+  }
+}
