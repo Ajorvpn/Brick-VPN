@@ -2,3 +2,7 @@ node_modules
 .expo
 .turbo
 dist
+.github/copilot-instructions.md
+.github/instructions/expo-app.instructions.md
+.github/instructions/shared-packages.instructions.md
+.gitignore
