@@ -1,0 +1,34 @@
+apply plugin: 'com.android.library'
+apply plugin: 'org.jetbrains.kotlin.android'
+
+android {
+    namespace 'expo.modules.v2ray'
+    compileSdkVersion rootProject.ext.get('compileSdkVersion') ?: 34
+
+    defaultConfig {
+        minSdkVersion rootProject.ext.get('minSdkVersion') ?: 24
+        targetSdkVersion rootProject.ext.get('targetSdkVersion') ?: 34
+        versionCode 1
+        versionName '1.0'
+    }
+
+    buildFeatures {
+        buildConfig true
+    }
+
+    compileOptions {
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    kotlinOptions {
+        jvmTarget = '17'
+    }
+}
+
+dependencies {
+    implementation 'androidx.core:core-ktx:1.13.0'
+    implementation 'androidx.appcompat:appcompat:1.13.0'
+    implementation 'androidx.lifecycle:lifecycle-service:2.8.0'
+    implementation fileTree(dir: 'libs', include: ['*.aar', '*.jar'])
+}
