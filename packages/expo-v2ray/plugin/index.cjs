@@ -1,7 +1,7 @@
-const { withAndroidManifest } = require('@expo/config-plugins');
+const { withAndroidColors, withAndroidManifest } = require('@expo/config-plugins');
 
 module.exports = function withExpoV2ray(config) {
-  return withAndroidManifest(config, (config) => {
+  config = withAndroidManifest(config, (config) => {
     const manifest = config.modResults;
     const application = manifest.application?.[0];
 
@@ -43,6 +43,21 @@ module.exports = function withExpoV2ray(config) {
     const alreadyPresent = application.service.some((entry) => entry.$['android:name'] === '.ExpoV2rayVpnService');
     if (!alreadyPresent) {
       application.service.push(service);
+    }
+
+    return config;
+  });
+
+  return withAndroidColors(config, (config) => {
+    const colors = config.modResults;
+
+    if (!colors.resources?.color?.some((entry) => entry.$?.name === 'splashscreen_background')) {
+      colors.resources = colors.resources || {};
+      colors.resources.color = colors.resources.color || [];
+      colors.resources.color.push({
+        $: { name: 'splashscreen_background' },
+        _: '#ffffff',
+      });
     }
 
     return config;

@@ -8,7 +8,9 @@ import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
 class ExpoV2rayModule : Module() {
-  private val serviceController by lazy { VpnServiceController(appContext.reactContext) }
+  private val serviceController by lazy {
+    VpnServiceController(requireNotNull(appContext.reactContext) { "React context is not available" })
+  }
   private var pendingPreparePromise: Promise? = null
 
   override fun definition() = ModuleDefinition {
@@ -44,14 +46,14 @@ class ExpoV2rayModule : Module() {
       }
     }
 
-    OnActivityResult { _, requestCode, resultCode, _ ->
-      if (requestCode != VPN_PREPARE_REQUEST_CODE) {
+    OnActivityResult { _, payload ->
+      if (payload.requestCode != VPN_PREPARE_REQUEST_CODE) {
         return@OnActivityResult
       }
 
       val promise = pendingPreparePromise
       pendingPreparePromise = null
-      val ready = resultCode == Activity.RESULT_OK
+      val ready = payload.resultCode == Activity.RESULT_OK
       val result = mapOf(
         "ready" to ready,
         "requiresUserConsent" to !ready,
