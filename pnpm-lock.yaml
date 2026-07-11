@@ -50,6 +50,9 @@ importers:
 
   packages/expo-v2ray:
     dependencies:
+      expo-modules-core:
+        specifier: ~1.12.26
+        version: 1.12.26
       react:
         specifier: 18.2.0
         version: 18.2.0

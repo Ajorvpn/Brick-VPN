@@ -23,6 +23,7 @@ apps/*/ios/
 .env
 .env.local
 .env.*.local
+memory.json
 
 # Logs
 *.log

@@ -1,4 +1,4 @@
-import { NativeEventEmitter, NativeModules, type NativeModule } from 'react-native';
+import { EventEmitter, requireNativeModule } from 'expo-modules-core';
 import type {
   VpnEventName,
   VpnListenerSubscription,
@@ -16,89 +16,42 @@ type NativeVpnModule = {
   getStatus(): Promise<VpnStatusResult>;
 };
 
-const nativeModule = NativeModules.ExpoV2ray as NativeVpnModule | undefined;
-const eventEmitter = nativeModule
-  ? new NativeEventEmitter(NativeModules.ExpoV2ray as NativeModule)
-  : null;
+const nativeModule = requireNativeModule<NativeVpnModule>('ExpoV2ray');
+const emitter = new EventEmitter(nativeModule as never);
 
 export const expoV2ray = {
-  async prepareVpn(): Promise<VpnPrepareResult> {
-    if (!nativeModule?.prepareVpn) {
-      return {
-        ready: false,
-        requiresUserConsent: false,
-        state: 'error',
-        message: 'Expo V2Ray native module is unavailable.',
-      };
-    }
-
+  prepareVpn(): Promise<VpnPrepareResult> {
     return nativeModule.prepareVpn();
   },
-
-  async startVpn(config: string): Promise<VpnStatusResult> {
-    if (!nativeModule?.startVpn) {
-      return {
-        state: 'error',
-        connected: false,
-        message: 'Expo V2Ray native module is unavailable.',
-      };
-    }
-
+  startVpn(config: string): Promise<VpnStatusResult> {
     return nativeModule.startVpn(config);
   },
-
-  async stopVpn(): Promise<VpnStatusResult> {
-    if (!nativeModule?.stopVpn) {
-      return {
-        state: 'stopped',
-        connected: false,
-        message: 'Expo V2Ray native module is unavailable.',
-      };
-    }
-
+  stopVpn(): Promise<VpnStatusResult> {
     return nativeModule.stopVpn();
   },
-
-  async getStatus(): Promise<VpnStatusResult> {
-    if (!nativeModule?.getStatus) {
-      return {
-        state: 'idle',
-        connected: false,
-        message: 'Expo V2Ray native module is unavailable.',
-      };
-    }
-
+  getStatus(): Promise<VpnStatusResult> {
     return nativeModule.getStatus();
   },
-
-  addListener<T extends VpnStateChangedPayload | VpnLogPayload | VpnTrafficPayload>(
-    eventName: VpnEventName,
-    listener: (payload: T) => void,
-  ): VpnListenerSubscription {
-    if (!eventEmitter) {
-      return { remove: () => undefined };
-    }
-
-    const subscription = eventEmitter.addListener(eventName, listener as never);
-    return {
-      remove: () => subscription.remove(),
-    };
-  },
-
   addStateListener(listener: (payload: VpnStateChangedPayload) => void): VpnListenerSubscription {
-    return expoV2ray.addListener('onStateChanged', listener);
+    const sub = emitter.addListener('onStateChanged', listener);
+    return { remove: () => sub.remove() };
   },
-
   addLogListener(listener: (payload: VpnLogPayload) => void): VpnListenerSubscription {
-    return expoV2ray.addListener('onLog', listener);
+    const sub = emitter.addListener('onLog', listener);
+    return { remove: () => sub.remove() };
   },
-
   addTrafficListener(listener: (payload: VpnTrafficPayload) => void): VpnListenerSubscription {
-    return expoV2ray.addListener('onTrafficUpdate', listener);
+    const sub = emitter.addListener('onTrafficUpdate', listener);
+    return { remove: () => sub.remove() };
   },
-
+  addListener<T>(eventName: VpnEventName, listener: (payload: T) => void): VpnListenerSubscription {
+    const sub = emitter.addListener(eventName, listener as never);
+    return { remove: () => sub.remove() };
+  },
   removeAllListeners(eventName?: VpnEventName) {
-    eventEmitter?.removeAllListeners(eventName ?? '');
+    if (eventName) {
+      emitter.removeAllListeners(eventName);
+    }
   },
 };
 

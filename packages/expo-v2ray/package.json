@@ -15,6 +15,7 @@
     "lint": "echo 'Linting not configured yet'"
   },
   "dependencies": {
+    "expo-modules-core": "~1.12.26",
     "react": "18.2.0",
     "react-native": "0.74.5"
   },
