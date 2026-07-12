@@ -16,3 +16,5 @@ Place any future `.aar` artifacts in:
 
 ## Important note
 This scaffold intentionally does not claim that a real VPN tunnel is working. The actual VPN core integration remains pending.
+
+AjorVpn@gmail.com
