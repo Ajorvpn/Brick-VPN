@@ -2,11 +2,12 @@ import { EventEmitter, requireNativeModule } from 'expo-modules-core';
 import type {
   VpnEventName,
   VpnListenerSubscription,
-  VpnLogPayload,
+  VpnLogEvent,
   VpnPrepareResult,
-  VpnStateChangedPayload,
+  VpnStateEvent,
   VpnStatusResult,
-  VpnTrafficPayload,
+  VpnTrafficEvent,
+  VpnTrafficStats,
 } from './types';
 
 type NativeVpnModule = {
@@ -14,6 +15,8 @@ type NativeVpnModule = {
   startVpn(config: string): Promise<VpnStatusResult>;
   stopVpn(): Promise<VpnStatusResult>;
   getStatus(): Promise<VpnStatusResult>;
+  getTrafficStats(): Promise<VpnTrafficStats>;
+  getLogs(): Promise<string[]>;
 };
 
 const nativeModule = requireNativeModule<NativeVpnModule>('ExpoV2ray');
@@ -32,15 +35,21 @@ export const expoV2ray = {
   getStatus(): Promise<VpnStatusResult> {
     return nativeModule.getStatus();
   },
-  addStateListener(listener: (payload: VpnStateChangedPayload) => void): VpnListenerSubscription {
+  getTrafficStats(): Promise<VpnTrafficStats> {
+    return nativeModule.getTrafficStats();
+  },
+  getLogs(): Promise<string[]> {
+    return nativeModule.getLogs();
+  },
+  addStateListener(listener: (payload: VpnStateEvent) => void): VpnListenerSubscription {
     const sub = emitter.addListener('onStateChanged', listener);
     return { remove: () => sub.remove() };
   },
-  addLogListener(listener: (payload: VpnLogPayload) => void): VpnListenerSubscription {
+  addLogListener(listener: (payload: VpnLogEvent) => void): VpnListenerSubscription {
     const sub = emitter.addListener('onLog', listener);
     return { remove: () => sub.remove() };
   },
-  addTrafficListener(listener: (payload: VpnTrafficPayload) => void): VpnListenerSubscription {
+  addTrafficListener(listener: (payload: VpnTrafficEvent) => void): VpnListenerSubscription {
     const sub = emitter.addListener('onTrafficUpdate', listener);
     return { remove: () => sub.remove() };
   },
@@ -58,11 +67,12 @@ export const expoV2ray = {
 export type {
   VpnEventName,
   VpnListenerSubscription,
-  VpnLogPayload,
+  VpnLogEvent,
   VpnPrepareResult,
-  VpnStateChangedPayload,
+  VpnStateEvent,
   VpnStatusResult,
-  VpnTrafficPayload,
+  VpnTrafficEvent,
+  VpnTrafficStats,
 } from './types';
 
 export default expoV2ray;

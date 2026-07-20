@@ -7,7 +7,7 @@ import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
 
-class ExpoV2rayModule : Module() {
+class ExpoV2rayModule : Module(), VpnEventBus.Listener {
   private val serviceController by lazy {
     VpnServiceController(requireNotNull(appContext.reactContext) { "React context is not available" })
   }
@@ -17,6 +17,14 @@ class ExpoV2rayModule : Module() {
     Name("ExpoV2ray")
 
     Events("onStateChanged", "onLog", "onTrafficUpdate")
+
+    OnCreate {
+      VpnEventBus.addListener(this@ExpoV2rayModule)
+    }
+
+    OnDestroy {
+      VpnEventBus.removeListener(this@ExpoV2rayModule)
+    }
 
     AsyncFunction("prepareVpn") { promise: Promise ->
       val activity = appContext.currentActivity ?: run {
@@ -78,12 +86,8 @@ class ExpoV2rayModule : Module() {
         }
 
         val result = serviceController.startVpn(activity, config)
-        emitState("service-started", "Service running, VPN core not yet integrated.")
-        emitLog("info", "VPN service start requested")
         promise.resolve(result)
       } catch (throwable: Throwable) {
-        emitState("error", throwable.message ?: "Failed to start VPN")
-        emitLog("error", throwable.message ?: "Failed to start VPN")
         promise.reject("E_VPN_START", throwable.message ?: "Failed to start VPN", throwable)
       }
     }
@@ -91,12 +95,8 @@ class ExpoV2rayModule : Module() {
     AsyncFunction("stopVpn") { promise: Promise ->
       try {
         val result = serviceController.stopVpn()
-        emitState("stopped", "VPN service stopped")
-        emitLog("info", "VPN service stopped")
         promise.resolve(result)
       } catch (throwable: Throwable) {
-        emitState("error", throwable.message ?: "Failed to stop VPN")
-        emitLog("error", throwable.message ?: "Failed to stop VPN")
         promise.reject("E_VPN_STOP", throwable.message ?: "Failed to stop VPN", throwable)
       }
     }
@@ -108,6 +108,39 @@ class ExpoV2rayModule : Module() {
         promise.reject("E_VPN_STATUS", throwable.message ?: "Failed to read VPN status", throwable)
       }
     }
+
+    AsyncFunction("getTrafficStats") { promise: Promise ->
+      try {
+        promise.resolve(serviceController.getTrafficStats())
+      } catch (throwable: Throwable) {
+        promise.reject("E_STATS", throwable.message ?: "Failed to read traffic stats", throwable)
+      }
+    }
+
+    AsyncFunction("getLogs") { promise: Promise ->
+      try {
+        promise.resolve(serviceController.getRecentLogs())
+      } catch (throwable: Throwable) {
+        promise.reject("E_LOGS", throwable.message ?: "Failed to read VPN logs", throwable)
+      }
+    }
+  }
+
+  override fun onState(event: VpnEventBus.StateEvent) {
+    sendEvent("onStateChanged", mapOf("state" to event.state, "message" to event.message))
+  }
+
+  override fun onLog(event: VpnEventBus.LogEvent) {
+    sendEvent("onLog", mapOf("level" to event.level, "message" to event.message))
+  }
+
+  override fun onTraffic(event: VpnEventBus.TrafficEvent) {
+    sendEvent("onTrafficUpdate", mapOf(
+      "uploadBytes" to event.uploadBytes,
+      "downloadBytes" to event.downloadBytes,
+      "uploadSpeed" to event.uploadSpeed,
+      "downloadSpeed" to event.downloadSpeed,
+    ))
   }
 
   private fun emitState(state: String, message: String) {

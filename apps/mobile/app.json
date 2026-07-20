@@ -10,6 +10,9 @@
     },
     "android": {
       "package": "com.brick.app"
-    }
+    },
+    "plugins": [
+      "../../packages/expo-v2ray/plugin/index.cjs"
+    ]
   }
 }

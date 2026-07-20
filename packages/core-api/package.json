@@ -13,5 +13,8 @@
     "build": "pnpm exec tsc --noEmit -p tsconfig.json",
     "typecheck": "pnpm exec tsc --noEmit -p tsconfig.json",
     "lint": "echo 'Linting not configured yet'"
+  },
+  "dependencies": {
+    "zustand": "^5.0.14"
   }
 }
