@@ -21,3 +21,6 @@ When handling a coding task, follow this order exactly:
 - Verify the result before claiming success.
 - Avoid deprecated APIs, outdated patterns, and shortcuts. Clearly identify when an approach replaces an outdated pattern with a modern, supported alternative.
 - If ambiguity remains after analysis, stop and ask clarifying questions rather than making assumptions.
+
+## Project-Specific Context
+For project stack, architecture, native module API, and file-ownership rules, read `AGENTS.md` at the repository root before making changes. `AGENTS.md` is the source of truth for project-specific facts; this file (`copilot-instructions.md`) is the source of truth for general engineering principles.

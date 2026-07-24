@@ -1,6 +1,7 @@
 package expo.modules.v2ray
 
 import android.content.Context
+import android.net.ConnectivityManager
 import android.net.IpPrefix
 import android.os.Build
 import com.hiddify.core.libbox.ConnectionOwner
@@ -15,9 +16,14 @@ import com.hiddify.core.libbox.StringIterator
 import com.hiddify.core.libbox.TunOptions
 import com.hiddify.core.libbox.WIFIState
 import java.net.InetAddress
+import java.net.InetSocketAddress
 
 class PlatformInterfaceImpl(private val vpnService: ExpoV2rayVpnService) : PlatformInterface {
   private val context: Context = vpnService.applicationContext
+
+  private val connectivityManager: ConnectivityManager? by lazy {
+    vpnService.applicationContext.getSystemService(Context.CONNECTIVITY_SERVICE) as? ConnectivityManager
+  }
 
   override fun openTun(options: TunOptions): Int = try {
     VpnEventBus.emitLog("info", "Opening VPN TUN interface")
@@ -91,10 +97,63 @@ class PlatformInterfaceImpl(private val vpnService: ExpoV2rayVpnService) : Platf
     }
   }
 
-  override fun autoDetectInterfaceControl(interfaceType: Int) = Unit
+  override fun autoDetectInterfaceControl(fd: Int) {
+    // sing-box passes a raw socket FD here; we MUST protect() it or traffic loops
+    // (gomobile strips the param name to 'interfaceType', but the value is an FD)
+    if (fd < 0) return
+    val ok = vpnService.protect(fd)
+    if (!ok) {
+      VpnEventBus.emitLog("warn", "vpnService.protect($fd) returned false")
+    }
+  }
+
   override fun clearDNSCache() = Unit
   override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener) = Unit
-  override fun findConnectionOwner(interfaceType: Int, interfaceName: String, type: Int, name: String, flags: Int): ConnectionOwner? = null
+
+  override fun findConnectionOwner(
+    ipProtocol: Int,
+    sourceAddress: String,
+    sourcePort: Int,
+    destinationAddress: String,
+    destinationPort: Int,
+  ): ConnectionOwner {
+    // Always return a valid ConnectionOwner (never null) to prevent Go SIGSEGV.
+    // If lookup fails, return one with userId=-1 (Process.INVALID_UID).
+    val owner = ConnectionOwner()
+    owner.setUserId(-1)
+
+    if (Build.VERSION.SDK_INT < Build.VERSION_CODES.Q) {
+      // getConnectionOwnerUid requires API 29+
+      return owner
+    }
+
+    return try {
+      val cm = connectivityManager ?: return owner
+
+      // ipProtocol from sing-box is already OsConstants.IPPROTO_TCP (6) or IPPROTO_UDP (17)
+      val local = InetSocketAddress(sourceAddress, sourcePort)
+      val remote = InetSocketAddress(destinationAddress, destinationPort)
+
+      val uid = cm.getConnectionOwnerUid(ipProtocol, local, remote)
+      if (uid < 0) return owner
+
+      owner.setUserId(uid)
+
+      // Best-effort package name resolution (optional per sing-box; safe to skip on error)
+      val packageName = vpnService.applicationContext.packageManager
+        .getPackagesForUid(uid)?.firstOrNull()
+      if (packageName != null) {
+        owner.setAndroidPackageName(packageName)
+        owner.setUserName(packageName)
+      }
+
+      owner
+    } catch (throwable: Throwable) {
+      VpnEventBus.emitLog("warn", "findConnectionOwner lookup failed: ${throwable.message}")
+      owner // still valid, uid=-1
+    }
+  }
+
   override fun getInterfaces(): NetworkInterfaceIterator? = null
   override fun includeAllNetworks(): Boolean = false
   override fun localDNSTransport(): LocalDNSTransport? = null
@@ -104,5 +163,5 @@ class PlatformInterfaceImpl(private val vpnService: ExpoV2rayVpnService) : Platf
   override fun systemCertificates(): StringIterator? = null
   override fun underNetworkExtension(): Boolean = false
   override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
-  override fun useProcFS(): Boolean = false
+  override fun useProcFS(): Boolean = Build.VERSION.SDK_INT < Build.VERSION_CODES.Q
 }

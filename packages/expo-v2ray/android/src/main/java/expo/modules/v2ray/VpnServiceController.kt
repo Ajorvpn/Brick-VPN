@@ -51,6 +51,13 @@ class VpnServiceController(private val context: Context) {
         "message" to "VPN service is stopped.",
       )
     }
+    if (instance.isStopping()) {
+      return mapOf(
+        "state" to "stopping",
+        "connected" to false,
+        "message" to "Stopping VPN service.",
+      )
+    }
     val coreRunning = instance.isCoreRunning()
     val tunUp = instance.hasTunEstablished()
     val connected = coreRunning && tunUp

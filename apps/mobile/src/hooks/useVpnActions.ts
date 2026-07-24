@@ -12,6 +12,16 @@ export const useVpnActions = () => {
     useLogsStore.getState().appendLog(message, level);
 
   const handleStart = useCallback(async () => {
+    const { status, busy } = useVpnStore.getState();
+    if (busy) {
+      appendLog('start:skipped busy', 'debug');
+      return;
+    }
+    if (status.state === 'starting' || status.state === 'connected') {
+      appendLog(`start:skipped already ${status.state}`, 'debug');
+      return;
+    }
+
     if (!activeConfig) {
       Alert.alert('No config', 'Import a config first');
       appendLog('start:error no config', 'warn');
@@ -46,6 +56,16 @@ export const useVpnActions = () => {
   }, [activeConfig, setBusy, setStatus]);
 
   const handleStop = useCallback(async () => {
+    const { status, busy } = useVpnStore.getState();
+    if (busy) {
+      appendLog('stop:skipped busy', 'debug');
+      return;
+    }
+    if (status.state === 'stopping' || status.state === 'stopped' || status.state === 'idle') {
+      appendLog(`stop:skipped already ${status.state}`, 'debug');
+      return;
+    }
+
     setBusy(true);
     try {
       const result = await expoV2ray.stopVpn();

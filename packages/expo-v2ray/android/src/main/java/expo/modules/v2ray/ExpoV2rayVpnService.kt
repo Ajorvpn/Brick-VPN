@@ -14,16 +14,20 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.runBlocking
 
 class ExpoV2rayVpnService : VpnService() {
   private var coreController: HiddifyCoreController? = null
   @Volatile
   private var tunEstablished = false
+  @Volatile
+  private var stopping = false
   private val scope = CoroutineScope(Dispatchers.IO + SupervisorJob())
 
   override fun onCreate() {
     super.onCreate()
     instance = this
+    stopping = false
     createNotificationChannel()
     startForeground(
       VpnServiceController.NOTIFICATION_ID,
@@ -45,19 +49,23 @@ class ExpoV2rayVpnService : VpnService() {
       return START_NOT_STICKY
     }
     tunEstablished = false
+    stopping = false
     coreController = HiddifyCoreController(this)
     scope.launch {
       val controller = coreController ?: return@launch
       if (controller.setup().isSuccess) controller.start(config)
     }
-    return START_STICKY
+    return START_NOT_STICKY
   }
 
   override fun onBind(intent: Intent?): IBinder? = null
 
   override fun onDestroy() {
+    stopping = true
     stopForeground(STOP_FOREGROUND_REMOVE)
-    coreController?.stop()
+    runBlocking {
+      runCatching { coreController?.stop() }
+    }
     tunEstablished = false
     scope.cancel()
     instance = null
@@ -73,6 +81,8 @@ class ExpoV2rayVpnService : VpnService() {
   fun hasTunEstablished(): Boolean = tunEstablished
 
   fun isCoreRunning(): Boolean = coreController?.isRunning() == true
+
+  fun isStopping(): Boolean = stopping
 
   fun getCurrentStats(): TrafficStats? = coreController?.getStats()
 
