@@ -6,8 +6,6 @@ import com.hiddify.core.libbox.Libbox
 import com.hiddify.core.libbox.OverrideOptions
 import com.hiddify.core.libbox.SetupOptions
 import com.hiddify.core.libbox.SystemProxyStatus
-import kotlinx.coroutines.runBlocking
-import kotlinx.coroutines.withTimeoutOrNull
 import java.io.File
 import java.util.concurrent.atomic.AtomicBoolean
 
@@ -21,6 +19,7 @@ data class TrafficStats(
 class HiddifyCoreController(private val vpnService: ExpoV2rayVpnService) {
   private val platformInterface = PlatformInterfaceImpl(vpnService)
   private var commandServer: CommandServer? = null
+  private val coreRunning = AtomicBoolean(false)
   private var workingDir: File = File(vpnService.filesDir, "working")
   private var basePath: File = vpnService.filesDir
 
@@ -84,6 +83,8 @@ class HiddifyCoreController(private val vpnService: ExpoV2rayVpnService) {
         throw IllegalArgumentException("Invalid sing-box config: ${t.message}", t)
       }
 
+      // TODO(security): Config JSON contains secrets (UUIDs, passwords). Consider encrypting
+      // with EncryptedFile or moving to memory-only handoff via CommandServer API.
       File(basePath, "current-config.json").writeText(configJson)
 
       val handler = object : CommandServerHandler {
@@ -93,7 +94,9 @@ class HiddifyCoreController(private val vpnService: ExpoV2rayVpnService) {
             enabled = false
           }
 
-        override fun serviceReload() = Unit
+        override fun serviceReload() {
+          VpnEventBus.emitLog("info", "Core requested service reload (not implemented)")
+        }
 
         override fun serviceStop() {
           try {
@@ -140,18 +143,16 @@ class HiddifyCoreController(private val vpnService: ExpoV2rayVpnService) {
       return Result.success(Unit)
     }
 
-    runBlocking {
-      val timedOut = withTimeoutOrNull(3_000L) {
-        runCatching { server.closeService() }
-          .onFailure { VpnEventBus.emitLog("warn", "closeService failed: ${it.message}") }
-        runCatching { server.close() }
-          .onFailure { VpnEventBus.emitLog("warn", "close failed: ${it.message}") }
-        Unit
-      }
-      if (timedOut == null) {
-        VpnEventBus.emitLog("warn", "CommandServer stop timed out after 3s; forcing shutdown")
-      }
-    }
+    // Fire-and-forget on a background daemon thread; do NOT block caller.
+    Thread {
+      runCatching { server.closeService() }
+        .onFailure { VpnEventBus.emitLog("warn", "closeService failed: ${it.message}") }
+      runCatching { server.close() }
+        .onFailure { VpnEventBus.emitLog("warn", "close failed: ${it.message}") }
+    }.apply {
+      name = "HiddifyCoreShutdown"
+      isDaemon = true
+    }.start()
 
     VpnEventBus.emitState("stopped", "VPN core stopped")
     return Result.success(Unit)
@@ -183,7 +184,7 @@ class HiddifyCoreController(private val vpnService: ExpoV2rayVpnService) {
   }
 
   companion object {
+    // Libbox.setup() is a process-wide global; can only be called once per process lifetime
     private val initializedOnce = AtomicBoolean(false)
-    private val coreRunning = AtomicBoolean(false)
   }
 }

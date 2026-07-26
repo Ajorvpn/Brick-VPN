@@ -194,10 +194,13 @@ const parseVmess = (uri: string): ParsedServer | null => {
             id: generateServerId('vmess', value.add, port, {
               uuid: value.id,
               alter_id: value.aid,
+              // Map VMess base64 fields to canonical query-param names used by transportFor
+              type: (value.net && ['ws', 'grpc', 'httpupgrade'].includes(String(value.net))) ? String(value.net) : undefined,
               network: value.net,
-              type: value.type,
+              header_type: value.type,
               host: value.host,
               path: value.path,
+              serviceName: value.path, // gRPC path is service name
               security: value.tls,
               sni: value.sni,
             }),
@@ -208,10 +211,13 @@ const parseVmess = (uri: string): ParsedServer | null => {
             raw: {
               uuid: value.id,
               alter_id: value.aid,
+              // Map VMess base64 fields to canonical query-param names used by transportFor
+              type: (value.net && ['ws', 'grpc', 'httpupgrade'].includes(String(value.net))) ? String(value.net) : undefined,
               network: value.net,
-              type: value.type,
+              header_type: value.type,
               host: value.host,
               path: value.path,
+              serviceName: value.path, // gRPC path is service name
               security: value.tls,
               sni: value.sni,
             },
@@ -393,11 +399,36 @@ const transportFor = (raw: Record<string, unknown>): Record<string, unknown> | u
 const tlsFor = (server: ParsedServer, reality: boolean): Record<string, unknown> => {
   const raw = server.raw;
   const fingerprint = stringValue(raw, 'fp');
+
   const tls: Record<string, unknown> = {
     enabled: true,
     server_name: stringValue(raw, 'sni') ?? server.server,
   };
-  if (fingerprint) tls.utls = { enabled: true, fingerprint };
+
+  // Honor allowInsecure / insecure query params (either name may appear in URIs)
+  const allowInsecure = stringValue(raw, 'allowInsecure') ?? stringValue(raw, 'insecure');
+  if (allowInsecure === '1' || allowInsecure === 'true') {
+    tls.insecure = true;
+  }
+
+  // ALPN — parse from `alpn` query, comma-separated
+  const alpnRaw = stringValue(raw, 'alpn');
+  if (alpnRaw) {
+    const alpn = alpnRaw
+      .split(',')
+      .map((s) => s.trim())
+      .filter((s) => s.length > 0);
+    if (alpn.length > 0) tls.alpn = alpn;
+  }
+
+  // uTLS fingerprint — needed for modern anti-DPI
+  if (fingerprint) {
+    tls.utls = { enabled: true, fingerprint };
+  } else if (reality) {
+    // Reality REQUIRES utls; default to chrome
+    tls.utls = { enabled: true, fingerprint: 'chrome' };
+  }
+
   if (reality) {
     tls.reality = {
       enabled: true,
@@ -405,6 +436,7 @@ const tlsFor = (server: ParsedServer, reality: boolean): Record<string, unknown>
       short_id: stringValue(raw, 'sid') ?? '',
     };
   }
+
   return tls;
 };
 
@@ -436,9 +468,23 @@ export const toSingBoxOutbound = (server: ParsedServer): Record<string, unknown>
         password: stringValue(raw, 'password') ?? '',
       };
       break;
-    case 'hysteria2':
-      outbound = { type: 'hysteria2', ...base, password: stringValue(raw, 'password') ?? '', tls: tlsFor(server, false) };
+    case 'hysteria2': {
+      const hy2: Record<string, unknown> = {
+        type: 'hysteria2',
+        ...base,
+        password: stringValue(raw, 'password') ?? '',
+        tls: tlsFor(server, false),
+      };
+      const obfs = stringValue(raw, 'obfs');
+      if (obfs) {
+        hy2.obfs = {
+          type: obfs,
+          password: stringValue(raw, 'obfs-password') ?? stringValue(raw, 'obfsParam') ?? '',
+        };
+      }
+      outbound = hy2;
       break;
+    }
     case 'tuic':
       outbound = {
         type: 'tuic',
@@ -459,36 +505,39 @@ export const buildSingBoxConfig = (server: ParsedServer, options: BuildConfigOpt
     log: { level: options.logLevel ?? 'info', timestamp: true },
     dns: {
       servers: [
-        { tag: 'google', address: 'tls://8.8.8.8', detour: 'proxy' },
+        { tag: 'proxy-dns', address: 'tls://8.8.8.8', detour: 'proxy' },
         { tag: 'local', address: 'local', detour: 'direct' },
       ],
       rules: [
-        { outbound: 'direct', server: 'local' },
+        { outbound: 'any', server: 'local' },
       ],
+      final: 'proxy-dns',
+      strategy: 'prefer_ipv4',
     },
     inbounds: options.enableTun === false ? [] : [{
       type: 'tun',
       tag: 'tun-in',
       interface_name: 'tun0',
-      address: ['172.19.0.1/30'],
+      address: ['172.19.0.1/30', 'fdfe:dcba:9876::1/126'],
       mtu: options.mtu ?? 1500,
       auto_route: true,
-      strict_route: true,
-      stack: 'system',
-      sniff: true,
-      endpoint_independent_nat: true,
+      strict_route: false,
+      stack: 'mixed',
     }],
     outbounds: [
       toSingBoxOutbound(server),
       { type: 'direct', tag: 'direct' },
       { type: 'block', tag: 'block' },
-      { type: 'dns', tag: 'dns-out' },
     ],
     route: {
-      auto_detect_interface: false,
+      auto_detect_interface: true,
+      override_android_vpn: true,
+      default_domain_resolver: 'local',
       final: 'proxy',
       rules: [
-        { protocol: 'dns', outbound: 'dns-out' },
+        { action: 'sniff' },
+        { protocol: 'dns', action: 'hijack-dns' },
+        { ip_is_private: true, outbound: 'direct' },
       ],
     },
   };

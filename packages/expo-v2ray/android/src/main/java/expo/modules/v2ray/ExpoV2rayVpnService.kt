@@ -14,7 +14,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.runBlocking
 
 class ExpoV2rayVpnService : VpnService() {
   private var coreController: HiddifyCoreController? = null
@@ -62,13 +61,12 @@ class ExpoV2rayVpnService : VpnService() {
 
   override fun onDestroy() {
     stopping = true
+    instance = null  // Clear immediately so getStatus returns "stopped" right away
     stopForeground(STOP_FOREGROUND_REMOVE)
-    runBlocking {
-      runCatching { coreController?.stop() }
-    }
+    runCatching { coreController?.stop() }
+    coreController = null
     tunEstablished = false
     scope.cancel()
-    instance = null
     super.onDestroy()
   }
 

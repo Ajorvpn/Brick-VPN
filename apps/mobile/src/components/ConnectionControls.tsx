@@ -16,7 +16,7 @@ export const ConnectionControls = ({ status, activeConfig, busy, onStart, onStop
       onPress={onStart}
       disabled={!activeConfig || busy || status.state === 'connected' || status.state === 'starting'}
     />
-    <Button title="Stop" onPress={onStop} disabled={busy || status.state === 'stopped' || status.state === 'idle'} />
+    <Button title="Stop" onPress={onStop} disabled={busy || status.state === 'stopped' || status.state === 'idle' || status.state === 'stopping'} />
   </View>
 );
 

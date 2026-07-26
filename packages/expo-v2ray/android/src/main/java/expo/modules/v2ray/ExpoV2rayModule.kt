@@ -16,7 +16,7 @@ class ExpoV2rayModule : Module(), VpnEventBus.Listener {
   override fun definition() = ModuleDefinition {
     Name("ExpoV2ray")
 
-    Events("onStateChanged", "onLog", "onTrafficUpdate")
+    Events("onStateChanged", "onLog", "onTrafficUpdate", "onPrepareStateChanged")
 
     OnCreate {
       VpnEventBus.addListener(this@ExpoV2rayModule)
@@ -41,13 +41,15 @@ class ExpoV2rayModule : Module(), VpnEventBus.Listener {
             "state" to "ready",
             "message" to "VPN permission is already granted.",
           )
-          emitState("ready", "VPN permission already granted")
+          emitPrepareState("ready", "VPN permission already granted")
           promise.resolve(result)
           return@AsyncFunction
         }
 
+        // Reject any previous pending prepare to avoid Promise leak
+        pendingPreparePromise?.reject("E_VPN_PREPARE_SUPERSEDED", "Another prepareVpn was requested", null)
         pendingPreparePromise = promise
-        emitState("preparing", "Requesting VPN permission from the user")
+        emitPrepareState("preparing", "Requesting VPN permission from the user")
         activity.startActivityForResult(intent, VPN_PREPARE_REQUEST_CODE)
       } catch (throwable: Throwable) {
         promise.reject("E_VPN_PREPARE", throwable.message ?: "Failed to prepare VPN", throwable)
@@ -70,9 +72,9 @@ class ExpoV2rayModule : Module(), VpnEventBus.Listener {
       )
 
       if (ready) {
-        emitState("ready", "VPN permission granted")
+        emitPrepareState("ready", "VPN permission granted")
       } else {
-        emitState("preparing", "VPN permission was denied")
+        emitPrepareState("preparing", "VPN permission was denied")
       }
 
       promise?.resolve(result)
@@ -145,6 +147,10 @@ class ExpoV2rayModule : Module(), VpnEventBus.Listener {
 
   private fun emitState(state: String, message: String) {
     sendEvent("onStateChanged", mapOf("state" to state, "message" to message))
+  }
+
+  private fun emitPrepareState(state: String, message: String) {
+    sendEvent("onPrepareStateChanged", mapOf("state" to state, "message" to message))
   }
 
   private fun emitLog(level: String, message: String) {
