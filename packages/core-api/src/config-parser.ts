@@ -211,13 +211,12 @@ const parseVmess = (uri: string): ParsedServer | null => {
             raw: {
               uuid: value.id,
               alter_id: value.aid,
-              // Map VMess base64 fields to canonical query-param names used by transportFor
               type: (value.net && ['ws', 'grpc', 'httpupgrade'].includes(String(value.net))) ? String(value.net) : undefined,
               network: value.net,
               header_type: value.type,
               host: value.host,
               path: value.path,
-              serviceName: value.path, // gRPC path is service name
+              serviceName: value.path,
               security: value.tls,
               sni: value.sni,
             },

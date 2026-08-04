@@ -83,8 +83,7 @@ class HiddifyCoreController(private val vpnService: ExpoV2rayVpnService) {
         throw IllegalArgumentException("Invalid sing-box config: ${t.message}", t)
       }
 
-      // TODO(security): Config JSON contains secrets (UUIDs, passwords). Consider encrypting
-      // with EncryptedFile or moving to memory-only handoff via CommandServer API.
+      // TODO(security): Config JSON contains secrets. Consider encrypting with EncryptedFile.
       File(basePath, "current-config.json").writeText(configJson)
 
       val handler = object : CommandServerHandler {
@@ -143,7 +142,6 @@ class HiddifyCoreController(private val vpnService: ExpoV2rayVpnService) {
       return Result.success(Unit)
     }
 
-    // Fire-and-forget on a background daemon thread; do NOT block caller.
     Thread {
       runCatching { server.closeService() }
         .onFailure { VpnEventBus.emitLog("warn", "closeService failed: ${it.message}") }
@@ -184,7 +182,6 @@ class HiddifyCoreController(private val vpnService: ExpoV2rayVpnService) {
   }
 
   companion object {
-    // Libbox.setup() is a process-wide global; can only be called once per process lifetime
     private val initializedOnce = AtomicBoolean(false)
   }
 }

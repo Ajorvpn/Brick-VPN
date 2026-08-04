@@ -25,6 +25,9 @@ apps/*/ios/
 .env.*.local
 memory.json
 
+# Internal tracking (personal, not for public repo)
+.internal/
+
 # Logs
 *.log
 npm-debug.log*

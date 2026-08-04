@@ -150,16 +150,11 @@ class PlatformInterfaceImpl(private val vpnService: ExpoV2rayVpnService) : Platf
 
   override fun startDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
     defaultInterfaceListener = listener
-    // Note: full network callback integration would require ConnectivityManager.NetworkCallback.
-    // For now we register the listener so the core can query us; interface changes will be picked
-    // up on next getInterfaces() call.
     VpnEventBus.emitLog("info", "Default interface monitor registered")
   }
 
   override fun closeDefaultInterfaceMonitor(listener: InterfaceUpdateListener) {
-    if (defaultInterfaceListener === listener) {
-      defaultInterfaceListener = null
-    }
+    if (defaultInterfaceListener === listener) defaultInterfaceListener = null
   }
 
   override fun findConnectionOwner(
@@ -202,8 +197,7 @@ class PlatformInterfaceImpl(private val vpnService: ExpoV2rayVpnService) : Platf
       val cm = connectivityManager
       val javaIfaces = JavaNetworkInterface.getNetworkInterfaces() ?: return EmptyInterfaceIterator
 
-      // Build map of interface name -> NetworkCapabilities/LinkProperties from ConnectivityManager
-      val ifaceMetadata = mutableMapOf<String, Pair<Int, Boolean>>() // name -> (type, metered)
+      val ifaceMetadata = mutableMapOf<String, Pair<Int, Boolean>>()
       val ifaceDns = mutableMapOf<String, List<String>>()
       if (cm != null && Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
         try {
@@ -230,23 +224,15 @@ class PlatformInterfaceImpl(private val vpnService: ExpoV2rayVpnService) : Platf
         val boxIface = LibboxNetworkInterface()
         boxIface.name = javaIface.name
         boxIface.index = javaIface.index
-        try {
-          boxIface.mtu = javaIface.mtu
-        } catch (_: Throwable) {
-          boxIface.mtu = 1500
-        }
+        try { boxIface.mtu = javaIface.mtu } catch (_: Throwable) { boxIface.mtu = 1500 }
         val addresses = javaIface.interfaceAddresses.mapNotNull { addr ->
           addr.address?.hostAddress?.let { "$it/${addr.networkPrefixLength}" }
         }
         boxIface.addresses = SimpleStringIterator(addresses.iterator())
-
         val (type, metered) = ifaceMetadata[javaIface.name] ?: Pair(Libbox.InterfaceTypeOther, false)
         boxIface.type = type
         boxIface.metered = metered
-
-        val dnsList = ifaceDns[javaIface.name] ?: emptyList()
-        boxIface.dnsServer = SimpleStringIterator(dnsList.iterator())
-
+        boxIface.dnsServer = SimpleStringIterator((ifaceDns[javaIface.name] ?: emptyList()).iterator())
         var flags = 0
         try {
           if (javaIface.isUp) flags = flags or 0x1
@@ -255,7 +241,6 @@ class PlatformInterfaceImpl(private val vpnService: ExpoV2rayVpnService) : Platf
           if (javaIface.supportsMulticast()) flags = flags or 0x1000
         } catch (_: Throwable) {}
         boxIface.flags = flags
-
         boxInterfaces.add(boxIface)
       }
     } catch (throwable: Throwable) {
@@ -270,14 +255,13 @@ class PlatformInterfaceImpl(private val vpnService: ExpoV2rayVpnService) : Platf
 
   override fun readWIFIState(): WIFIState = Libbox.newWIFIState("", "")
   override fun sendNotification(notification: Notification) = Unit
-  override fun systemCertificates(): StringIterator = SimpleStringIterator(systemCertsPem.iterator())
+  override fun systemCertificates(): StringIterator = SimpleStringIterator(systemCertsPem)
   override fun underNetworkExtension(): Boolean = false
   override fun usePlatformAutoDetectInterfaceControl(): Boolean = true
   override fun useProcFS(): Boolean = false
 
-  private class SimpleStringIterator(items: List<String>) : StringIterator {
+  private class SimpleStringIterator(private val list: List<String>) : StringIterator {
     constructor(iterator: Iterator<String>) : this(iterator.asSequence().toList())
-    private val list = items
     private var index = 0
     override fun hasNext(): Boolean = index < list.size
     override fun next(): String = list[index++]

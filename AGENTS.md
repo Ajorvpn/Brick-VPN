@@ -22,7 +22,8 @@ Universal instructions for AI coding assistants (GitHub Copilot, Cursor, Claude 
 - `packages/expo-v2ray` — Expo native module wrapping libbox
 - `packages/ui-theme` — theme tokens
 
-## VPN flow (canonical)
+## VPN flow (canonical)\
+
 
 ```
 User taps Start

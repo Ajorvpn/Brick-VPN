@@ -7,33 +7,25 @@ const POLLING_INTERVAL_MS = 2000;
 const logError = (msg: string) =>
   useLogsStore.getState().appendLog(msg, 'warn');
 
-const isValidState = (s: unknown): s is VpnStatus['state'] =>
-  typeof s === 'string' &&
-  ['idle', 'preparing', 'ready', 'starting', 'connected', 'stopping', 'stopped', 'error'].includes(s);
-
-const validateStatus = (raw: unknown): VpnStatus | null => {
-  if (typeof raw !== 'object' || raw === null) return null;
-  const r = raw as Record<string, unknown>;
-  if (!isValidState(r.state)) return null;
-  return {
-    state: r.state,
-    connected: typeof r.connected === 'boolean' ? r.connected : false,
-    message: typeof r.message === 'string' ? r.message : '',
-  };
-};
-
 const refreshStatus = async () => {
   try {
     const raw = await expoV2ray.getStatus();
-    const result = validateStatus(raw);
-    if (!result) {
+    if (typeof raw !== 'object' || raw === null) {
       logError('polling:status-invalid');
       return;
     }
+    const r = (raw as unknown) as Record<string, unknown>;
+    const validStates = ['idle', 'preparing', 'ready', 'starting', 'connected', 'stopping', 'stopped', 'error'];
+    if (typeof r.state !== 'string' || !validStates.includes(r.state)) {
+      logError('polling:status-invalid-state');
+      return;
+    }
+    const result: VpnStatus = {
+      state: r.state as VpnStatus['state'],
+      connected: typeof r.connected === 'boolean' ? r.connected : false,
+      message: typeof r.message === 'string' ? r.message : '',
+    };
     const currentState = useVpnStore.getState().status.state;
-
-    // Don't let polling downgrade a terminal state:
-    // If JS already sees "stopped" or "idle", polling can only lift to "starting/connected".
     if ((currentState === 'stopped' || currentState === 'idle') && result.state === 'stopping') {
       return;
     }
