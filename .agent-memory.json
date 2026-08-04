@@ -1,0 +1,25 @@
+{
+  "phases": {
+    "0": "IN_PROGRESS",
+    "1": "NOT_STARTED",
+    "2": "NOT_STARTED",
+    "3": "NOT_STARTED",
+    "4": "NOT_STARTED"
+  },
+  "fixes": {
+    "1": false,
+    "2": false,
+    "3": false,
+    "4": false,
+    "5": false,
+    "6": false,
+    "7": false,
+    "8": false,
+    "9": false,
+    "10": false,
+    "11": false,
+    "12": false,
+    "13": false
+  },
+  "logs": []
+}
